@@ -11,7 +11,7 @@ from metagpt.environment.werewolf.const import (
     RoleType,
 )
 from metagpt.environment.werewolf.env_space import EnvAction, EnvActionType
-from metagpt.ext.werewolf.actions import Hunt, Poison, Protect, Save, Verify
+from metagpt.ext.werewolf.actions import Hunt, Poison, Protect, Save, Verify, Speak
 from metagpt.ext.werewolf.actions.moderator_actions import (
     AnnounceGameResult,
     InstructSpeak,
@@ -75,6 +75,9 @@ class Moderator(BasePlayer):
         restricted_to = set()
 
         msg_cause_by = latest_msg.cause_by
+        
+        # logger.info(f'parse speak {latest_msg_content=}, {latest_msg.cause_by}, {latest_msg.sent_from}, {target}')
+
         if msg_cause_by == any_to_str(Hunt):
             self.rc.env.step(
                 EnvAction(
@@ -122,6 +125,29 @@ class Moderator(BasePlayer):
                         target_player_name=target,
                     )
                 )
+        elif msg_cause_by == any_to_str(Speak) and 'vote to eliminate' in latest_msg_content:
+            self.rc.env.step(
+                EnvAction(
+                    action_type=EnvActionType.VOTE_KILL, player_name=latest_msg.sent_from, target_player_name=target
+                )
+            )
+            vote_msgs = memories[-6:-1]
+            logger.info(vote_msgs)
+            for vote_m in vote_msgs:
+                latest_msg_content = vote_m.content
+                if 'vote to eliminate' not in latest_msg_content:
+                    continue
+                match = re.search(r"Player[0-9]+", latest_msg_content[-10:])  # FIXME: hard code truncation
+                target = match.group(0) if match else ""
+
+                self.rc.env.step(
+                    EnvAction(
+                        action_type=EnvActionType.VOTE_KILL, player_name=vote_m.sent_from, target_player_name=target
+                    )
+                )
+        else:
+            pass
+            # logger.error(f'unknown msg_case_by: {msg_cause_by}')
 
         return msg_content, restricted_to
 
@@ -147,6 +173,9 @@ class Moderator(BasePlayer):
                 # if the msg is not send to the whole audience ("") nor this role (self.profile or self.name),
                 # then this role should not be able to receive it and record it into its memory
                 continue
+            if isinstance(m.cause_by, AnnounceGameResult):
+                # game over, exit
+                return 0
             self.rc.memory.add(m)
         # add `MESSAGE_ROUTE_TO_ALL in n.send_to` make it to run `ParseSpeak`
         self.rc.news = [
@@ -183,7 +212,7 @@ class Moderator(BasePlayer):
 
     async def _act(self):
         todo = self.rc.todo
-        logger.info(f"{self._setting} ready to {todo}")
+        logger.info(f"{self._setting} ready to {todo}. step_idx: {self.step_idx}")
 
         memories = self.get_all_memories(mode="msg")
 
@@ -211,15 +240,22 @@ class Moderator(BasePlayer):
                 player_hunted=player_hunted,
                 player_current_dead=player_current_dead,
             )
-            # msg_content = f"Step {self.step_idx}: {msg_content}" # HACK: 加一个unique的step_idx避免记忆的自动去重
-            msg = WwMessage(
-                content=msg_content,
-                role=self.profile,
-                sent_from=self.name,
-                cause_by=InstructSpeak,
-                send_to=msg_to_send_to,
-                restricted_to=msg_restricted_to,
-            )
+
+            is_role_dead = self.rc.env.is_special_role_dead(msg_to_send_to.copy().pop())
+            logger.warning(f'check msg if send to living: {msg_to_send_to=}, {living_players=}')
+            if not is_role_dead:
+                # msg_content = f"Step {self.step_idx}: {msg_content}" # HACK: 加一个unique的step_idx避免记忆的自动去重
+                msg = WwMessage(
+                    content=msg_content,
+                    role=self.profile,
+                    sent_from=self.name,
+                    cause_by=InstructSpeak,
+                    send_to=msg_to_send_to,
+                    restricted_to=msg_restricted_to,
+                )
+            else:
+                logger.info(f'special role has died: {msg_to_send_to.copy().pop()}')
+                msg = None
             logger.info(f"current step_idx: {self.step_idx}")
             self.rc.env.step(EnvAction(action_type=EnvActionType.PROGRESS_STEP))  # to update step_idx
 
@@ -239,7 +275,7 @@ class Moderator(BasePlayer):
             msg_content = await AnnounceGameResult().run(winner=self.winner, win_reason=self.win_reason)
             msg = WwMessage(content=msg_content, role=self.profile, sent_from=self.name, cause_by=AnnounceGameResult)
 
-        logger.info(f"{self._setting}: {msg_content}")
+        logger.error(f"{self._setting}: {msg_content}")
 
         return msg
 

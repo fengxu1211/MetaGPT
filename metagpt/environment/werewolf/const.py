@@ -114,7 +114,7 @@ You only choose one from the following living options please:
         "restricted_to": empty_set,
     },
     18: {
-        "content": """{player_current_dead} was eliminated.""",
+        "content": """{player_current_dead} was eliminated by vote.""",
         "send_to": {RoleType.MODERATOR.value},
         "restricted_to": empty_set,
     },

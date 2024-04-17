@@ -1,13 +1,21 @@
 from metagpt.actions import Action
 from metagpt.environment.werewolf.const import STEP_INSTRUCTIONS
-
+from metagpt.logs import logger
+import time
 
 class InstructSpeak(Action):
     name: str = "InstructSpeak"
 
-    async def run(self, step_idx, living_players, werewolf_players, player_hunted, player_current_dead):
+    async def run(self, step_idx, living_players, werewolf_players, player_hunted, player_current_dead) -> tuple[str, set, set]:
+        # fix 1nd round is not ending issue
+        mod_step_idx = step_idx % len(STEP_INSTRUCTIONS)
+
+        if mod_step_idx in (15, 18):
+            logger.info('waiting for 5s...')
+            time.sleep(5)
+
         instruction_info = STEP_INSTRUCTIONS.get(
-            step_idx, {"content": "Unknown instruction.", "send_to": {}, "restricted_to": {}}
+            mod_step_idx, {"content": "Unknown instruction.", "send_to": {}, "restricted_to": {}}
         )
         content = instruction_info["content"]
         if "{living_players}" in content and "{werewolf_players}" in content:

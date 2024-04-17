@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropicBedrock
 from anthropic.types import Message, Usage
 
 from metagpt.configs.llm_config import LLMConfig, LLMType
@@ -19,7 +20,8 @@ class AnthropicLLM(BaseLLM):
 
     def __init_anthropic(self):
         self.model = self.config.model
-        self.aclient: AsyncAnthropic = AsyncAnthropic(api_key=self.config.api_key, base_url=self.config.base_url)
+        # self.aclient: AsyncAnthropic = AsyncAnthropic(api_key=self.config.api_key, base_url=self.config.base_url)
+        self.aclient: AsyncAnthropicBedrock = AsyncAnthropicBedrock(aws_region='us-west-2')
 
     def _const_kwargs(self, messages: list[dict], stream: bool = False) -> dict:
         kwargs = {

@@ -52,6 +52,7 @@ class BasePlayer(Role):
         return self
 
     async def _observe(self, ignore_memory=False) -> int:
+        # logger.info(f'_player observe: {self._setting}, {self.status}')
         if self.status != RoleState.ALIVE:
             # 死者不再参与游戏
             return 0
@@ -77,6 +78,8 @@ class BasePlayer(Role):
         return len(self.rc.news)
 
     async def _think(self):
+        # logger.info(f'_player think: {self._setting}, {self.status}')
+
         news = self.rc.news[0]
         assert news.cause_by == any_to_str(InstructSpeak)  # 消息为来自Moderator的指令时，才去做动作
         if not news.restricted_to:
@@ -88,6 +91,7 @@ class BasePlayer(Role):
             self.rc.todo = self.special_actions[0]()
 
     async def _act(self):
+        # logger.info(f'_player act: {self._setting}, {self.status}')
         # todo为_think时确定的，有两种情况，Speak或Protect
         todo = self.rc.todo
         logger.info(f"{self._setting}: ready to {str(todo)}")
@@ -114,14 +118,19 @@ class BasePlayer(Role):
 
         # 根据自己定义的角色Action，对应地去run，run的入参可能不同
         if isinstance(todo, Speak):
-            rsp = await todo.run(
-                profile=self.profile,
-                name=self.name,
-                context=memories,
-                latest_instruction=latest_instruction,
-                reflection=reflection,
-                experiences=experiences,
-            )
+            if self.status != RoleState.DEAD:
+                rsp = await todo.run(
+                    profile=self.profile,
+                    name=self.name,
+                    context=memories,
+                    latest_instruction=latest_instruction,
+                    reflection=reflection,
+                    experiences=experiences,
+                )
+            else:
+                logger.info('dead man can NOT speak')
+                rsp = ''
+
             restricted_to = set()
 
         elif isinstance(todo, NighttimeWhispers):
@@ -149,7 +158,7 @@ class BasePlayer(Role):
             )
         )
 
-        logger.info(f"{self._setting}: {rsp}")
+        logger.warning(f"{self._setting}: {rsp}")
 
         return msg
 

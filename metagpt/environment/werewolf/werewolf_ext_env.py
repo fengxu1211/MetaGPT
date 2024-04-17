@@ -116,6 +116,17 @@ class WerewolfExtEnv(ExtEnv):
             terminated = True
         return terminated
 
+    def is_special_role_dead(self, role_name: str) -> bool:
+        if role_name not in ('Guard', 'Witch', 'Seer'):
+            return False
+        
+        live_special_role = set()
+        for p_name, (role_name, role_state) in self.players_state.items():
+            if role_state == RoleState.ALIVE:
+                live_special_role.add(role_name)
+            
+        return role_name not in live_special_role
+
     @property
     def living_players(self) -> list[str]:
         player_names = []
@@ -175,9 +186,18 @@ class WerewolfExtEnv(ExtEnv):
         if shuffle:
             random.shuffle(role_objs)
         if add_human:
-            assigned_role_idx = random.randint(0, len(role_objs) - 1)
-            assigned_role = role_objs[assigned_role_idx]
-            role_objs[assigned_role_idx] = prepare_human_player(assigned_role)  # TODO
+            # assigned_role_idx = random.randint(0, len(role_objs) - 1)
+            # Assign first role to human
+            # assigned_role_idx = 0
+            # assigned_role = role_objs[assigned_role_idx]
+            # role_objs[assigned_role_idx] = prepare_human_player(assigned_role)  # TODO
+
+            # Assign all roles to human
+            human_role_objs = []
+            for role_obj in role_objs:
+                human_role_objs.append(prepare_human_player(role_obj))
+            # replace role list
+            role_objs = human_role_objs
 
         players = [
             role(
@@ -190,8 +210,8 @@ class WerewolfExtEnv(ExtEnv):
             for i, role in enumerate(role_objs)
         ]
 
-        if add_human:
-            logger.info(f"You are assigned {players[assigned_role_idx].name}({players[assigned_role_idx].profile})")
+        # if add_human:
+        #     logger.info(f"You are assigned {players[assigned_role_idx].name}({players[assigned_role_idx].profile})")
 
         game_setup = ["Game setup:"] + [f"{player.name}: {player.profile}," for player in players]
         self.game_setup = "\n".join(game_setup)
@@ -201,6 +221,7 @@ class WerewolfExtEnv(ExtEnv):
         return self.game_setup, players
 
     def _update_players_state(self, player_names: list[str], state: RoleState = RoleState.KILLED):
+        logger.info('update player state', player_names, state)
         for player_name in player_names:
             if player_name in self.players_state:
                 roletype_state = self.players_state[player_name]
@@ -247,15 +268,23 @@ class WerewolfExtEnv(ExtEnv):
         player_name: if it's None, regard as abstaining from voting
         """
         if not self._check_player_continue(voter_name, particular_step=18):  # 18=step no
+            logger.warning(f'vote_kill_someone skipped.')
             return
 
+        logger.info(f'vote_kill_someone: {voter_name}, {player_name}')
+
         self.round_votes[voter_name] = player_name
+        # logger.info(f'round_votes keys {list(self.round_votes.keys())}')
+        # logger.info(f'living_players {self.living_players}')
         # check if all living players finish voting, then get the dead one
-        if list(self.round_votes.keys()) == self.living_players:
+        if sorted(list(self.round_votes.keys())) == self.living_players:
             voted_all = list(self.round_votes.values())  # TODO in case of tie vote, check who was voted first
             voted_all = [item for item in voted_all if item]
             self.player_current_dead = [Counter(voted_all).most_common()[0][0]]
+            logger.info(f'trigger vote kill {self.player_current_dead}')
             self._update_players_state(self.player_current_dead)
+            # reset vote dict
+            self.round_votes = {}
 
     @mark_as_writeable
     def wolf_kill_someone(self, wolf_name: str, player_name: str):

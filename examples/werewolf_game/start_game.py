@@ -41,11 +41,11 @@ async def start_game(
 
 
 def main(
-    investment: float = 20.0,
-    n_round: int = 100,
-    shuffle: bool = True,
-    add_human: bool = False,
-    use_reflection: bool = True,
+    investment: float = 3.0,
+    n_round: int = 70,
+    shuffle: bool = False,
+    add_human: bool = True,
+    use_reflection: bool = False,
     use_experience: bool = False,
     use_memory_selection: bool = False,
     new_experience_version: str = "",

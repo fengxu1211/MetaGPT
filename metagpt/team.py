@@ -130,6 +130,7 @@ class Team(BaseModel):
             self._check_balance()
             await self.env.run()
 
-            logger.debug(f"max {n_round=} left.")
+            logger.info(f"max {n_round=} left.")
+        logger.warning('max n_round reached. Start to exit.')
         self.env.archive(auto_archive)
         return self.env.history

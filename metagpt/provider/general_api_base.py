@@ -46,7 +46,7 @@ MAX_CONNECTION_RETRIES = 2
 # Has one attribute per thread, 'session'.
 _thread_context = threading.local()
 
-LLM_LOG = os.environ.get("LLM_LOG", "debug")
+LLM_LOG = os.environ.get("LLM_LOG", "info")
 
 
 class ApiType(Enum):
